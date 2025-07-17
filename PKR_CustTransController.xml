@@ -50,21 +50,6 @@ internal final class PKR_CustTransController extends SrsReportRunController
         //super();
     }
 
-  
-    //protected container preRunValidate()
-    //{
-    //    PKR_CustTransContract contract = this.parmReportContract().parmRdpContract() as PKR_CustTransContract;
-
-    //    container ret = super();
-
-    //    // Check if field is empty
-    //    if (contract.parmCustAccount() =="")
-    //    {
-    //        ret = [SrsReportPreRunState::Error, "Customer account is required."];
-    //    }
-
-    //    return ret; // All good – proceed with report
-    //}
 
 ]]></Source>
 			</Method>
