@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>PKR_CustTransUIBuilder</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+internal final class PKR_CustTransUIBuilder extends SrsReportDataContractUIBuilder
+{
+    PKR_CustTransContract   contract;
+    DialogField             custAccountField;
+    DialogField             custGroupField;
+
+
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>postBuild</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///
+    /// </summary>
+    public void postBuild()
+    {
+        contract = this.dataContractObject() as PKR_CustTransContract;
+        custAccountField = this.bindInfo().getDialogField(contract,methodStr(PKR_CustTransContract,parmCustAccount));
+        custAccountField.registerOverrideMethod(methodStr(FormStringControl,lookup),methodStr(PKR_CustTransUIBuilder,custAccountLooup),this);
+        custGroupField = this.bindInfo().getDialogField(contract,methodStr(PKR_CustTransContract,parmCustGroup));
+        //super();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>custAccountLooup</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///
+    ///// </summary>
+    //public void build()
+    //{
+    //    contract = this.dataContractObject() as PKR_CustTransContract;
+    //    custAccountField = this.addDialogField(methodStr(PKR_CustTransContract,parmCustAccount));
+    //    custGroupField = this.addDialogField(methodStr(PKR_CustTransContract,parmCustGroup));
+    //    super();
+    //}
+
+    public void custAccountLooup(FormControl _formControl)
+    {
+        SysTableLookup          sysTableLookup = SysTableLookup::newParameters(tableNum(CustTable),_formControl);
+        Query                   query = new Query();
+        QueryBuildDataSource    qbds;
+        QueryBuildRange         qbr;
+        
+        contract = this.dataContractObject() as PKR_CustTransContract;
+
+        qbds =  query.addDataSource(tablenum(CustTable));
+        qbr = qbds.addRange(fieldnum(CustTable, CustGroup));
+        if (custGroupField.value() != '')
+        {
+            qbr.value(queryValue(custGroupField.value()));
+        }
+        sysTableLookup.addLookupfield(fieldNum(CustTable,AccountNum));
+        sysTableLookup.addlookupmethod(tablemethodstr(CustTable,name));
+        sysTableLookup.parmQuery(query);
+        sysTableLookup.performFormLookup();
+
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

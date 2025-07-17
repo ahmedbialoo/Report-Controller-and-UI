@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>PKR_CustTransDP</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+[SrsReportParameterAttribute(classstr(PKR_CustTransContract))]
+public class PKR_CustTransDP extends SRSReportDataProviderBase
+{
+    PKR_CustTransTmp tmp;
+    CustAccount     custAccount;
+    CustGroupId       custGroup;
+
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>getCustTransTmp</Name>
+				<Source><![CDATA[
+    [SrsReportDataSetAttribute(tablestr(PKR_CustTransTmp))]
+    public PKR_CustTransTmp getCustTransTmp()
+    {
+        select tmp;
+        return tmp;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>processReport</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///
+    /// </summary>
+    public void processReport()
+    {
+        PKR_CustTransContract contract  = this.parmDataContract() as  PKR_CustTransContract;
+        custAccount                     = contract.parmCustAccount();
+        custGroup                       = contract.parmCustGroup();
+         
+        this.populateCustTrans();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>populateCustTrans</Name>
+				<Source><![CDATA[
+    public void populateCustTrans()
+    {
+        CustTrans           custTrans;
+        CustAccountName     custAccountName;
+        CustTable           custTable;
+        insert_recordset tmp(AccountNum,AmountCur,AmountMST,CurrencyCode,DocumentDate,DocumentNum,Invoice,TransDate,TransType ,Txt , Voucher, CustName, CustGroup)
+            select AccountNum,AmountCur,AmountMST,CurrencyCode,DocumentDate,DocumentNum,Invoice,TransDate,TransType ,Txt , Voucher 
+            from custTrans
+            where (custAccount == '' || custTrans.AccountNum == custAccount )
+            join Name from custAccountName
+            where custAccountName.AccountNum == custTrans.AccountNum
+            join CustGroup from custTable
+            where custTable.AccountNum == custTrans.AccountNum
+            && (custGroup == '' || custTable.CustGroup == custGroup);
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>PKR_CustTransContract</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+[
+DataContractAttribute,
+    SysOperationContractProcessingAttribute(classStr(PKR_CustTransUIBuilder), SysOperationDataContractProcessingMode::CreateUIBuilderForRootContractOnly)
+]
+public class PKR_CustTransContract implements SysOperationValidatable
+{
+    CustAccount custAccount;
+    CustGroupId   custGroup;
+
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>parmCustAccount</Name>
+				<Source><![CDATA[
+    [DataMemberAttribute('custAccount'),
+     SysOperationLabelAttribute(literalStr("Customer Account")),
+        SysOperationControlVisibilityAttribute(false)
+        ]
+    public CustAccount parmCustAccount(CustAccount _custAccount = custAccount)
+    {
+        custAccount = _custAccount;
+        return custAccount;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmCustGroup</Name>
+				<Source><![CDATA[
+    [DataMemberAttribute('custGroup'),
+     SysOperationLabelAttribute(literalStr("Customer Group")),
+        SysOperationControlVisibilityAttribute(false)
+        ]
+    public CustGroupId parmCustGroup(CustGroupId _custGroup = custGroup)
+    {
+        custGroup = _custGroup;
+        return custGroup;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>validate</Name>
+				<Source><![CDATA[
+    public boolean validate()
+    {
+        if(custAccount == '')
+        {
+        //    // warning and report start
+        //    //warning("Customer account is not selected. The report might return no data.");
+            // prevent report starting
+            return checkFailed("customer not valid");
+        }
+        return true;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>
