@@ -1,0 +1,188 @@
+[SrsReportParameterAttribute(classStr(SC_WFPendingContract))]
+internal final class SC_WFPendingDP extends SRSReportDataProviderBase
+{
+    SC_WFPendingTmp     tmp;
+    SC_WFReportParams   reportParamsTmp;
+    TransDate           startDate;
+    boolean             onlyPending;
+
+    [SrsReportDataSetAttribute(tableStr(SC_WFReportParams))]
+    public SC_WFReportParams getReportParamsTmp()
+    {
+        select reportParamsTmp;
+        return reportParamsTmp;
+    }
+
+    [SrsReportDataSetAttribute(tableStr(SC_WFPendingTmp))]
+    public SC_WFPendingTmp getTmp()
+    {
+        select tmp;
+        return tmp;
+    }
+
+    public void processReport()
+    {
+        SC_WFPendingContract contract = this.parmDataContract() as SC_WFPendingContract;
+        
+        startDate   = contract.parmStartDate();
+        onlyPending = contract.parmOnlyPending();
+
+        this.populateParameter();
+        this.runAll();
+    }
+
+    public void populatePendingWF(TableId _tableId)
+    {
+        WorkflowTrackingStatusTable trackingStatusTable;
+        WorkflowWorkItemTable       workItemTable;
+        utcDateTime                 utcStartDate = DateTimeUtil::newDateTime(startDate, 0);
+        
+        while select trackingStatusTable
+            where trackingStatusTable.ContextTableId   == _tableId
+               && trackingStatusTable.TrackingStatus   == WorkflowTrackingStatus::Pending
+               && trackingStatusTable.CreatedDateTime  >= utcStartDate
+               && (trackingStatusTable.ContextCompanyId == curExt() || trackingStatusTable.ContextCompanyId == "")
+        {
+            while select workItemTable
+                where workItemTable.CorrelationId == trackingStatusTable.CorrelationId
+            {
+                if (onlyPending && workItemTable.Status != WorkflowWorkItemStatus::Pending)
+                {
+                    continue;
+                }
+
+                this.insertTmpRecord(trackingStatusTable, workItemTable);
+            }
+        }
+    }
+
+    private void insertTmpRecord(WorkflowTrackingStatusTable _status, WorkflowWorkItemTable _workItem)
+    {
+        WorkflowTrackingTable trackingTable;
+        utcdatetime           endTime = _workItem.ModifiedDateTime;
+        boolean               isActionPending = (_workItem.CreatedDateTime == endTime);
+
+        tmp.clear();
+        tmp.ConfigurationName = _status.ConfigurationName;
+        tmp.InstanceNumber    = _status.InstanceNumber;
+        tmp.Document          = _status.Document;
+        tmp.WorkerName        = HcmWorker::find(HcmWorker::userId2Worker(_workItem.UserId)).name();
+        tmp.CreatedDate       = _workItem.CreatedDateTime;
+        tmp.Status            = _workItem.Status;
+
+        if (isActionPending)
+        {
+            tmp.ReactionDate   = dateNull(); 
+            tmp.ReactionPeriod = this.formatPeriod(_workItem.CreatedDateTime, DateTimeUtil::utcNow());
+        }
+        else
+        {
+            tmp.ReactionDate   = endTime;
+            
+            select firstonly TrackingType from trackingTable
+                where trackingTable.WorkflowTrackingStatusTable == _status.RecId
+                   && trackingTable.CreatedDateTime             == endTime
+                   && trackingTable.User                        == _workItem.UserId
+                   && trackingTable.TrackingContext             == WorkflowTrackingContext::WorkItem;
+
+            tmp.Action         = trackingTable.TrackingType;
+            tmp.ReactionPeriod = this.formatPeriod(_workItem.CreatedDateTime, endTime);
+        }
+
+        tmp.insert();
+    }
+
+    private str formatPeriod(utcdatetime _start, utcdatetime _end)
+    {
+        container period = SC_WFPendingDP::getDelayPeriod(_start, _end);
+        
+        if (conLen(period) == 0)
+        {
+            return "";
+        }
+
+        return strFmt("%1D - %2Hr - %3Mints", conPeek(period, 1), conPeek(period, 2), conPeek(period, 3));
+    }
+
+    public void runAll()
+    {
+        container tables = this.setWorkflowTables();
+
+        for (int i = 1; i <= conLen(tables); i++)
+        {
+            this.populatePendingWF(conPeek(tables, i));
+        }
+    }
+
+    protected container setWorkflowTables()
+    {
+        container tables;
+
+        // Add default tables
+        tables = this.addTable(tables, tableNum(PurchTable));
+        tables = this.addTable(tables, tableNum(PurchReqTable));
+        tables = this.addTable(tables, tableNum(BudgetTransactionHeader));
+
+        return tables;
+    }
+
+    /// <summary>
+    /// Helper method to cleanly add a table to the container.
+    /// </summary>
+    protected container addTable(container _tables, TableId _tableId)
+    {
+        return _tables + _tableId;
+    }
+
+    public void populateParameter()
+    {
+        CompanyInfo companyInfo  = CompanyInfo::find();
+        Bitmap      companyImage = CompanyImage::findByRecord(companyInfo).Image;
+
+        reportParamsTmp.CompanyLogo         = companyImage;
+        reportParamsTmp.CompanyName         = companyInfo.name();
+        reportParamsTmp.insert();
+    }
+
+    public static container getDelayPeriod(utcdatetime _createdDate, utcdatetime _emailSentDate = DateTimeUtil::utcNow())
+    {
+        // Define constants for time conversion
+        #define.SecondsPerDay(86400)
+        #define.SecondsPerHour(3600)
+        #define.SecondsPerMinute(60) // Added constant for minutes
+
+        int64       diffSeconds;
+        int         days, hours, minutes; // Added minutes variable
+        int64       remainingSeconds;
+
+        // Check if the input date is valid
+        if (_createdDate == DateTimeUtil::minValue())
+        {
+            return conNull();
+        }
+
+        // Calculate the difference in seconds between Email Sent and Created Date
+        diffSeconds = DateTimeUtil::getDifference(_emailSentDate, _createdDate);
+
+        // If the date is in the future, return null
+        if (diffSeconds < 0)
+        {
+            return conNull();
+        }
+
+        // 1. Calculate Days
+        days = diffSeconds / #SecondsPerDay;
+
+        // 2. Calculate remaining seconds to find Hours
+        remainingSeconds = diffSeconds mod #SecondsPerDay;
+        hours = remainingSeconds / #SecondsPerHour;
+
+        // 3. Calculate remaining seconds to find Minutes
+        remainingSeconds = remainingSeconds mod #SecondsPerHour; // Update remainder after extracting hours
+        minutes = remainingSeconds / #SecondsPerMinute;
+
+        // Return container with Days, Hours, AND Minutes
+        return [days, hours, minutes];
+    }
+
+}
